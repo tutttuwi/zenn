@@ -21,3 +21,13 @@ npx zenn new:article
 npx zenn new:book
 ```
 
+- コミットプッシュ
+```
+bash commit-push.sh ""
+```
+
+- 記事プレビュー
+```
+npx zenn preview
+```
+
