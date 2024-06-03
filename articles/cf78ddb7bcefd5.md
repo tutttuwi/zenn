@@ -511,16 +511,192 @@ Kubernetesは、liveness（起動しているかどうか）とreadiness（応�
 
 `tcpSocket`: TCPソケットを開いて接続が成功したら監視成功
 
+`exec`監視も可能：コンテナ内でスクリプトなどを実行して返り値が0なら監視成功
+
 ### 5.7　リソース管理
+
+リソース要求：アプリケーションを動かすのに最低限必要なリソースを指定
+
+リソース制限：アプリケーションが使用する可能性のある最大リソース量を指定
+
 #### 5.7.1　リソース要求 : 必要最低限のリソース
+
+Kubernetesでは、コンテナを動かすために必要なリソースをPodが要求する
+
+Kubernetesは、Podが要求したリソースが使用可能なことを保証
+
+要求されることが多いリソースとしてはCPUやメモリがあるが、KubernetesはGPUなど他のリソースタイプもサポートしています。
+
+例としてkuardコンテナは、マシン上の1 CPUの半分が空いていて128MBのメモリを割り当てられるマシンに配置される必要があるとしましょう。その場合、Podの定義は例5-3のようになります。
+
+- kuard-pod-resreq.yaml
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kuard
+spec:
+  containers:
+    - image: gcr.io/kuar-demo/kuard-amd64:1
+      name: kuard
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "128Mi"
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+```
+
+- リソースの要求はPodごとではなくコンテナ毎に行う
+- Podによって要求される総リソース量は、Pod内の全コンテナが要求するリソースの総和になる
+
 #### 5.7.2　limitsを使ったリソース使用量の制限
+
+- kuard-pod-reslim.yaml
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kuard
+spec:
+  containers:
+    - image: gcr.io/kuar-demo/kuard-amd64:1
+      name: kuard
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "128Mi"
+        limits:
+          cpu: "1000m"
+          memory: "256Mi"
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+```
+
 ### 5.8　Volumeを使ったデータの永続化
+
 #### 5.8.1　VolumeとPodの組み合わせ
+
+- kuard-pod-vol.yaml
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kuard
+spec:
+  volumes: # Podマニフェスト内のコンテナからアクセスされる可能性のあるすべてのVolumeの一覧の配列
+    - name: "kuard-data"
+      hostPath:
+        path: "/var/lib/kuard"
+  containers:
+    - image: gcr.io/kuar-demo/kuard-amd64:1
+      name: kuard
+      volumeMounts: #特定のコンテナどのパスにボリュームをマウントするかを指定
+        - mountPath: "/data"
+          name: "kuard-data"
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+
+```
+
 #### 5.8.2　VolumeとPodを組み合わせる別の方法
+
+- コミュニケーション、同期
+  - emptyDir
+    - このVolumeはPodが停止されるまでしか使えないが、
+    - 2台のコンテナで共有でき、Gitの同期コンテナとWebサーバコンテナの間のコミュニケーション基盤になる
+- キャッシュ
+  - キャッシュ用のボリュームもemptyDirが有効
+- 永続化データ
+  - 永続化データを保存するストレージも利用可能
+  - KubernetesではNFSやiSCSIのようなプロトコル、AWS EBS, Azure Files and Disk Storage, GoogleのPersistentDiskなどもサポート
+- ホストのファイルシステムのマウント
+  - hostPath
+    - システム上のデバイスに対してブロックレベルでアクセスするため、`/dev`ファイルシステムにアクセスしたいケースなどで利用
+
 #### 5.8.3　リモートディスクを使った永続化データ
+
+NFSでネットワークのボリュームをマウントできる例
+
+```yaml
+...
+# Pod定義はここでは省略
+volumes:
+  - name: "kuard-data"
+    nfs:
+      server: my.nfs.server.local
+      path: "/exports"
+```
+
 ### 5.9　すべてまとめて実行する
+
+- kuard-pod-full.yaml
+
+```yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kuard
+spec:
+  volumes:
+    - name: "kuard-data"
+      nfs:
+        server: my.nfs.server.local
+        path: "/exports"
+  containers:
+    - image: gcr.io/kuar-demo/kuard-amd64:1
+      name: kuard
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "128Mi"
+        limits:
+          cpu: "1000m"
+          memory: "256Mi"
+      volumeMounts:
+        - mountPath: "/data"
+          name: "kuard-data"
+      livenessProbe:
+        httpGet:
+          path: /healthy
+          port: 8080
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        initialDelaySeconds: 30
+        timeoutSeconds: 1
+        periodSeconds: 10
+        failureThreshold: 3
+
+```
+
 ## 5.10　まとめ
+
+- PodマニフェストをAPIサーバに送信
+- KubernetesスケジューラはPodが動作できるマシンを探し、マシンにPodを割り当て
+- 割当が済むとマシン上の`kubelet`デーモンがPodに対応したコンテナを作成しPodマニフェストに定義されたヘルスチェックを実行
+
 ## 6章　LabelとAnnotation
+
 ### 6.1　Label
 #### 6.1.1　Labelの適用
 #### 6.1.2　Labelの変更
