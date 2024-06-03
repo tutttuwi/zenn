@@ -697,18 +697,122 @@ spec:
 
 ## 6章　LabelとAnnotation
 
+- Label：PodやReplicaSetといったKubernetesのオブジェクトに付与できるキーと値のペア
+  - 任意で付けることができ、Kubernetesのオブジェクトを特定するための情報を付与できる
+  - Labelはオブジェクトをグループ化するための基盤となる機能
+- Annotation：Labelと似たストレージの仕組み
+  - キーと値のペアだが、ツールやライブラリを便利に使用するために必要になる、オブジェクトを特定しない情報を入れられる
+
 ### 6.1　Label
+
+- オブジェクトのメタデータを特定するためのもの
+- オブジェクトをグループ化したり、一覧表示したり、操作したりする際の基本的機能
+
 #### 6.1.1　Labelの適用
+
 #### 6.1.2　Labelの変更
+
+`kubectl label deployments alpaca-test "canary=true"`
+
 #### 6.1.3　Labelセレクタ
+
+`kubectl get pods --show-labels`: ラベル一覧を表示
+
+`kubectl get pods --selector="app=bandicoot,ver=2"`: セレクタで絞り込み表示
+
 #### 6.1.4　APIオブジェクト内のLabelセレクタ
+
 ### 6.2　Annotation
+
+Labelとほぼ同じ用途で利用可能
+
+迷ったらAnnotationを使って、Selectorとして検索したくなったらLabelに昇格させるのがいい
+
+- Annotationの用途
+  - オブジェクトの変更理由の記録
+  - 特別なスケジューラへの特別なスケジューリングポリシーの伝達
+  - リソースを更新したツールと、どのように更新したかの情報の付加（他のツールから更新を検知したり、うまくマージしたりするため）
+  - Labelでは表現しづらいビルド、リリース、イメージ情報の保存（Gitのハッシュやタイムスタンプ、プルリクエスト番号など）
+  - Deploymentオブジェクト（12章）によるロールアウトのための、ReplicaSetの追跡情報の保存
+  - UIの見た目の品質や使いやすさを高める情報の保存。例えば、オブジェクトに対応するアイコンへのリンクの保存など（base64エンコードされた画像自体を入れることも可能）
+  - Kubernetesでのプロトタイプ機能の提供（専用のAPIフィールドを作る代わりに、その機能のパラメータを入れるのにAnnotationを使う）
+
 #### 6.2.1　Annotationの定義
+
+- Annotationは、次の例のようにKubernetesオブジェクトのmetadataセクション内で定義
+
+```yaml
+...
+metadata:
+  annotations:
+    example.com/icon-url: "https://example.com/icon.png"
+...
+```
+
 ### 6.3　後片付け
+
+`kubectl delete deployments --all`
+
 ### 6.4　まとめ
+
 ## 7章　サービスディスカバリ
+
 ### 7.1　サービスディスカバリとは
+
+ディスカバリサービス：何かを見つけるという問題とその解決策を一般的にこう呼ぶ
+
+DNSはインターネット上の伝統的なサービスディスカバリシステムだが、Kubernetesのダイナミックな正解には不十分
+
 ### 7.2　Serviceオブジェクト
+
+Kubernetesにおける本当のサービスディスカバリは`Sevice`オブジェクトから始まる
+
+`Service`オブジェクトは名前のついたLabelセレクタを作る仕組み
+
+`kubectl expose`コマンドでServiceを作成可能
+
+- 作成例）
+
+```bash
+
+$ kubectl run alpaca-prod \
+  --image=gcr.io/kuar-demo/kuard-amd64:1 \
+  --replicas=3 \
+  --port=8080 \
+  --labels="ver=1,app=alpaca,env=prod"
+$ kubectl expose deployment alpaca-prod
+$ kubectl run bandicoot-prod \
+  --image=gcr.io/kuar-demo/kuard-amd64:2 \
+  --replicas=2 \
+  --port=8080 \
+  --labels="ver=2,app=bandicoot,env=prod"
+$ kubectl expose deployment bandicoot-prod
+$ kubectl get services -o wide
+NAME            CLUSTER-IP    ... PORT(S)  ... SELECTOR
+alpaca-prod     10.115.245.13 ... 8080/TCP ... app=alpaca,env=prod,ver=1
+bandicoot-prod  10.115.242.3  ... 8080/TCP ... app=bandicoot,env=prod,ver=2
+kubernetes      10.115.240.1  ... 443/TCP  ... <none>
+
+```
+
+これらのコマンドを実行した後には、3つのServiceが確認できる
+
+kubernetesというServiceは、アプリケーションからKubernetesのAPIに接続し通信するために、自動的に作成されたもの
+
+ServiceはクラスタIPと呼ばれる新しいタイプの仮想IPアドレスを割り当てる
+
+これは、同じセレクタの付けられたすべてのPodにロードバランスするために使用する、特別なIPアドレス
+
+Serviceと通信するために、alpacaの中のPodにポートフォワードの設定をしましょう。ターミナル内で次のコマンドを実行して下さい。コマンドを終了しない限りポートフォワードが有効で、
+
+http://localhost:48858でalpacaにアクセスが可能
+
+```bash
+$ ALPACA_POD=$(kubectl get pods -l app=alpaca \
+  -o jsonpath='{.items[0].metadata.name}')
+$ kubectl port-forward $ALPACA_POD 48858:8080
+```
+
 #### 7.2.1　Service DNS
 #### 7.2.2　Readiness probe
 ### 7.3　クラスタの外に目を向ける
