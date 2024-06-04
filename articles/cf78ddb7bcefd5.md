@@ -814,16 +814,58 @@ $ kubectl port-forward $ALPACA_POD 48858:8080
 ```
 
 #### 7.2.1　Service DNS
+
 #### 7.2.2　Readiness probe
+
+Podがリクエストを受け付けられる状態かどうか監視する機能であるReadiness probe
+
 ### 7.3　クラスタの外に目を向ける
+
+外部からのアクセスを受け入れる際、Serviceを拡張するNodePortと呼ばれる機能を使うのが最もポータブル
+
+- `spec.type`フィールドを`NodePort`に変更するか
+- `kubectl expose`コマンドに`--type=NodePort`を指定することでService作成時にも設定可能
+
 ### 7.4　クラウドとの統合
+
+クラスタを動かしているクラウドでサポートされていて、
+
+かつクラスタが使用できるよう設定されていれば、LoadBalancerタイプを使用可能
+
+この機能で、クラウド上に新しいロードバランサが作成され、そのロードバランサ配下にクラスタ内のノードが入れられることで、NodePortを使って通信できるようになる
+
+`kubectl edit service alpaca-prod`を実行し、Service alpaca-prodを編集して`spec.type`を`LoadBalancer`に変更する
+
+編集直後に`kubectl get services`を実行すると、
+
+alpaca-prodのEXTERNAL-IP列が<pending>と表示される
+
+しばらく待つと、クラウドがパブリックアドレスを割り当てられる。
+
 ### 7.5　より高度な詳細
+
 #### 7.5.1　Endpoints
+
+- （略）
+
 #### 7.5.2　手動でのサービスディスカバリ
+
+`kubectl`を使用することで、各PodにどのIPアドレスが割り当てられているかを確認できる
+
+手動では限界があるので`Service`オブジェクトができた
+
 #### 7.5.3　kube-proxyとクラスタIP
+
+- （略）
+
 #### 7.5.4　クラスタIP関連の環境変数
+
 ### 7.6　後片付け
+
+`kubectl delete services,deployments -l app`
+
 ### 7.7　まとめ
+
 ## 8章　ReplicaSet
 ### 8.1　調整ループ
 ### 8.2　PodとReplicaSetの関連付け
