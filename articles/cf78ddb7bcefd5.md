@@ -1077,19 +1077,36 @@ spec:
 ### 10.3　まとめ
 
 ## 11章　ConfigMapとSecret
+
 ### 11.1　ConfigMap
+
 #### 11.1.1　ConfigMapの作成
+
 #### 11.1.2　ConfigMapの使用
+
 ### 11.2　Secret
+
 #### 11.2.1　Secretの作成
+
 #### 11.2.2　Secretの使用
+
 #### 11.2.3　プライベートDockerレジストリ
+
 ### 11.3　命名規則
+
 ### 11.4　ConfigMapとSecretの管理
+
 #### 11.4.1　一覧表示
+
 #### 11.4.2　作成
+
 #### 11.4.3　更新
+
 ### 11.5　まとめ
+
+- ConfigMap：環境毎の差異情報を管理
+- Secret：キー情報、パスワードなどを管理
+
 ## 12章　Deployment
 ### 12.1　最初のDeployment
 #### 12.1.1　Deploymentの仕組み
