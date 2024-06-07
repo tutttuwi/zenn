@@ -1108,6 +1108,9 @@ spec:
 - Secret：キー情報、パスワードなどを管理
 
 ## 12章　Deployment
+
+`Deployment`オブジェクト：新しいバージョンのリリースを管理する仕組み
+
 ### 12.1　最初のDeployment
 #### 12.1.1　Deploymentの仕組み
 ### 12.2　Deploymentの作成
