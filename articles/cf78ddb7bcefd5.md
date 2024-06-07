@@ -867,42 +867,215 @@ alpaca-prodのEXTERNAL-IP列が<pending>と表示される
 ### 7.7　まとめ
 
 ## 8章　ReplicaSet
+
+- 冗長性
+  - インスタンスを複数動かすと、障害を許容できる
+- スケール
+  - インスタンスを複数動かすと、多くのリクエストを受け付けられます
+- シャーディング
+  - 異なるコンテナのレプリカを動かすと、異なる種類の処理を同時に受け付けられる
+
+それぞれ違うPodマニフェストを使ってPodのコピーを手動で作るのも可能だが、退屈だし間違いを起こしやすくなる
+
+Podのレプリカを作るなら、そのレプリカ郡は１つのまとまりとして考えて管理するのが普通→これこそがReplicaSetの考え方
+
+ReplicaSetはクラスタ全体のPodマネージャ
+
 ### 8.1　調整ループ
+
+調整ループのベースには、望ましい状態（desired state）の概念がある
+
+望ましい状態とは、こうあって欲しいという状態
+
+ReplicaSetで言えば、レプリカの数や、複製するPodの定義
+
+例）kuardサーバを動かすPodのレプリカが3つ動いているようにしたい
+
+一方で現在の状態（observed stateまたはcurrent state）とは、システムのその時の状態
+
+例）kuardというPodが2つだけ動いている
+
+調整ループは、連続して動き続け、システムの現在の状態を観察し、システムの現在の状態が望ましい状態に一致するようにアクションを起す。
+
+前の例で言えば、現在の状態がレプリカ3つを持つという望ましい状態に一致するように、kuardのPodを1つ作成することに当たる
+
+状態を管理する方法としての調整ループには、たくさんの利点がある。
+
+調整ループは、本質的にゴール駆動型で、自己回復システムであり、しかもほとんどの場合数行のコードで表現可能
+
+この利点の具体例として、ReplicaSetの調整ループは、1つのループでReplicaSetのスケールアップもスケールダウンも、さらにはノード障害やノードの復活も扱える点がある
+
 ### 8.2　PodとReplicaSetの関連付け
+
+ReplicaSetとPodの関係も疎結合になっている
+
+ReplicaSetはPodを作成して管理するが、ReplicaSetがPodを所有しているわけではない。
+
+ReplicaSetは、管理すべきPodの集まりをLabelクエリによって識別
+
 #### 8.2.1　既存のコンテナを養子に入れる
+
 #### 8.2.2　コンテナの検疫
+
 ### 8.3　ReplicaSetを使ったデザイン
+
 ### 8.4　ReplicaSetの定義
+
 #### 8.4.1　Podテンプレート
+
 #### 8.4.2　Label
+
 ### 8.5　ReplicaSetの作成
+
 ### 8.6　ReplicaSetの調査
+
 #### 8.6.1　PodからのReplicaSetの特定
+
 #### 8.6.2　ReplicaSetに対応するPodの集合の特定
+
 ### 8.7　ReplicaSetのスケール
+
 #### 8.7.1　kubectl scaleを使った命令的スケール
+
 #### 8.7.2　kubectl applyを使った宣言的スケール
+
 #### 8.7.3　ReplicaSetのオートスケール
+
 ### 8.8　ReplicaSetの削除
+
 ### 8.9　まとめ
+
 ## 9章　DaemonSet
+
 ### 9.1　DaemonSetスケジューラ
+
 ### 9.2　DaemonSetの作成
+
 ### 9.3　特定ノードに対するDaemonSetの割り当ての制限
+
 #### 9.3.1　ノードへのLabelの追加
+
 #### 9.3.2　ノードセレクタ
+
 ### 9.4　DaemonSetの更新
+
 #### 9.4.1　個別のPodの削除によるDaemonSetの更新
+
 #### 9.4.2　DaemonSetのローリングアップデート
+
 ### 9.5　DaemonSetの削除
+
 ### 9.6　まとめ
+
 ## 10章　Job
+
+Job=1回限りの短い時間しか動かさない処理
+
 ### 10.1　Jobオブジェクト
+
+Jobオブジェクトは、Jobの設定に書かれたテンプレートで定義されたPodの作成や管理を実施、処理が成功するまで動き続ける。複数のPodを並列に動かすための調整も行う
+
+処理が完了する前に失敗した場合、JobコントローラはJobの設定内のPodテンプレートを元に、新しいPodを作成
+
+Podは必ずどこかのノードに割り当てられる必要があるので、必要なリソースをスケジューラが見つけられない場合、すぐにJobが実行されない可能性もある
+
+分散システムの性質上、障害の発生時には、同じタスクを実行するPodが複数作られることある
+
 ### 10.2　Jobのパターン
+
+| パターン                   | 使用例                                              | 動作                                         | completions | parallelism |
+| -------------------------- | --------------------------------------------------- | -------------------------------------------- | ----------- |
+| 1回限り                    | データベースマイグレーション                        | 1つのPodが処理                               | 1           | 1           |
+| 一定数成功するまで並列実行 | 複数のPodでタスクの集まりを並列処理                 | 指定回数成功するまで1つ以上のPodが複数回処理 | 1以上       | 1以上       |
+| 並列実行キュー             | 集約されたキューに入れられたタスクを複数のPodで処理 | 1回成功するまで1つ以上のPodが処理            | 1           | 2以上       |
+
 #### 10.2.1　1回限り
+
+```bash
+kubectl run -i oneshot \
+  --image=gcr.io/kuar-demo/kuard-amd64:1 \
+  --restart=OnFailure \
+  -- --keygen-enable \
+     --keygen-exit-on-complete \
+     --keygen-num-to-gen 10
+```
+
+- job-oneshot.yaml
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oneshot
+  labels:
+    chapter: jobs
+spec:
+  template:
+    metadata:
+      labels:
+        chapter: jobs
+    spec:
+      containers:
+      - name: kuard
+        image: gcr.io/kuar-demo/kuard-amd64:1
+        imagePullPolicy: Always
+        args:
+        - "--keygen-enable"
+        - "--keygen-exit-on-complete"
+        - "--keygen-num-to-gen=10"
+      restartPolicy: OnFailure
+```
+
+- ジョブ作成：`kubectl apply -f job-oneshot.yaml`
+
+- Podの障害
+- 複数のPodでエラーが発生
+  - restartPolicy: Neverを設定すると、kubeletはJob失敗時にPodを再起動せず、代わりにそのPodを失敗と宣言
+  - Jobオブジェクトがこれを検知すると、代わりのPodを作成
+  - このため、注意しておかないとクラスタ内にゴミが溜まってしまう
+  - Job実行に失敗したPodが再実行されるように、restartPolicy: OnFailureにしておくことを推奨
+
 #### 10.2.2　一定数成功するまで並列実行
+
+completionsとparallelismの両パラメータを組み合わせることで、並列実行する
+
+クラスタを処理能力いっぱいまで使ってしまわないように、同時に5つまでしかPodを動かさないようにする
+
+これを実現するには、completionを10に、parallelismを5二設定
+
+- job-parallel.yaml
+
+```yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel
+  labels:
+    chapter: jobs
+spec:
+  parallelism: 5
+  completions: 10
+  template:
+    metadata:
+      labels:
+        chapter: jobs
+    spec:
+      containers:
+      - name: kuard
+        image: gcr.io/kuar-demo/kuard-amd64:1
+        imagePullPolicy: Always
+        args:
+        - "--keygen-enable"
+        - "--keygen-exit-on-complete"
+        - "--keygen-num-to-gen=10"
+      restartPolicy: OnFailure
+```
+
 #### 10.2.3　並列実行キュー
+
 ### 10.3　まとめ
+
 ## 11章　ConfigMapとSecret
 ### 11.1　ConfigMap
 #### 11.1.1　ConfigMapの作成
